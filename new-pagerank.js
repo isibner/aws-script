@@ -46,13 +46,12 @@ var worker = function (line, callback) {
       callback();
     });
 };
-var q = async.queue(worker, 10);
+var q = async.queue(worker, 100);
 q.drain = function () {
   console.log(idx + ' items processed with ' + errors + ' errors');
 };
 
 hl(s3.getObject(pageRankParams).createReadStream()).split().toArray(function (array) {
-  array = array.slice(0,100);
   console.log('Starting with ' + array.length + ' items...');
   q.push(array); 
 });
