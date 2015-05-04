@@ -19,6 +19,7 @@ fs.truncateSync(FILENAME, 0);
 
 var idx = 0;
 var errors = 0;
+var delimiter = '\u2603\u2603\u2603';
 var worker = function (line, callback) {
     idx++;
     if (idx % 100 === 0) {
@@ -36,21 +37,22 @@ var worker = function (line, callback) {
       } else {
         description = description.replace(/(\r\n|\n|\r)/gm,'').trim();
       }
-      var delimiter = '\u2603\u2603\u2603';
       fs.appendFileSync(FILENAME, urlPageRank[0] + delimiter + urlPageRank[1] + delimiter + title + delimiter + description + '\n');
       callback();
     }, function (e) {
       console.log(e.message + ' while processing ' + urlPageRank[0]);
       errors++;
+      fs.appendFileSync(FILENAME, urlPageRank[0] + delimiter + urlPageRank[1] + delimiter + 'No title.' + delimiter + 'No description.' + '\n');
       callback();
     });
 };
-var q = async.queue(worker, 100);
+var q = async.queue(worker, 10);
 q.drain = function () {
   console.log(idx + ' items processed with ' + errors + ' errors');
 };
 
 hl(s3.getObject(pageRankParams).createReadStream()).split().toArray(function (array) {
+  array = array.slice(0,100);
   console.log('Starting with ' + array.length + ' items...');
   q.push(array); 
 });
