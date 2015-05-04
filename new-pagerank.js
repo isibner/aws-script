@@ -9,7 +9,11 @@ var fs = require('fs');
 var FILENAME = 'pageranks-with-descriptions';
 
 var sha1 = function(input){
-    return crypto.createHash('sha1').update(input).digest('hex');
+    var str = crypto.createHash('sha1').update(input).digest('hex');
+    while (str.charAt(0) === '0') {
+      str = str.substring(1);
+    }
+    return str;
 };
 
 var s3 = new AWS.S3();
