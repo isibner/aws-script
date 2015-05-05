@@ -27,50 +27,44 @@ var listObjectsParams = {Bucket: 'cis555-bucket', Prefix: folder_name + '/part-r
 var output_dir = 'ec2-data/tfidfs_out_1/';
 require('mkdirp').sync(output_dir);
 
+var Writable = require('stream').Writable;
+var write_stream = Writable();
+write_stream._write = function (chunk, enc, next) {
+  if (chunk.length > 10 * 1024 * 1024) {
+    console.log('chunk too large - had length ' + chunk.length);
+    next();
+  }
+  var data = chunk.toString();
+  var tabIndex = data.indexOf('\t');
+  if (tabIndex === -1) {
+    console.log('No tab char for ' + data);
+    console.log('ignoring...');
+    next();
+  } else {
+    var filename = output_dir + sha1(data.substring(0, tabIndex));
+    fs.writeFileSync(filename, data, {flag: 'w+'});
+    if (idx % 10000 === 0) {
+      console.log('Processed ' + idx + ' terms with ' + errors + ' errors.');
+    }
+    idx++;
+    next();
+  }
+};
+
+write_stream.on('finish', function () {
+  console.log('Finished processing ' + idx + ' terms with ' + errors + ' errors');
+});
+
+write_stream.on('error', function (e) {
+  errors++;
+  console.log('ERROR: ' + e.message);
+});
+
 s3.listObjects(listObjectsParams, function (_err, s3objects) {
   console.log(s3objects.Contents);
-  async.series(s3objects.Contents.map(function (datum) {
-    return function (callback) {
-      var getObjectParams = {Bucket: 'cis555-bucket', Key: datum.Key};
-      var strm = s3.getObject(getObjectParams).createReadStream();
-      var Writable = require('stream').Writable;
-      var write_stream = Writable();
-      write_stream._write = function (chunk, enc, next) {
-        if (chunk.length > 10 * 1024 * 1024) {
-          console.log('chunk too large - had length ' + chunk.length);
-          next();
-        }
-        var data = chunk.toString();
-        var tabIndex = data.indexOf('\t');
-        if (tabIndex === -1) {
-          console.log('No tab char for ' + data);
-          console.log('ignoring...');
-          next();
-        } else {
-          var filename = output_dir + sha1(data.substring(0, tabIndex));
-          fs.writeFileSync(filename, data, {flag: 'w+'});
-          if (idx % 10000 === 0) {
-            console.log('Processed ' + idx + ' terms with ' + errors + ' errors.');
-          }
-          idx++;
-          next();
-        }
-      };
-      hl(strm).split().pipe(write_stream);
-      write_stream.on('end', function () {
-        console.log('Finished a stream!');
-        callback();
-      });
-      write_stream.on('error', function (e) {
-        errors++;
-        console.log('ERROR: ' + e.message);
-      });
-    };
-  }), function (e) {
-    if (e) {
-      console.log('Finished but had error: ' + e.message);
-    } else {
-      console.log('Finished processing ' + idx + ' terms with no errors');
-    }
-  });
+  hl(s3objects.Contents).map(function (datum) {
+    var getObjectParams = {Bucket: 'cis555-bucket', Key: datum.Key};
+    var strm = s3.getObject(getObjectParams).createReadStream();
+    return strm;
+  }).series().split().pipe(write_stream);
 });
