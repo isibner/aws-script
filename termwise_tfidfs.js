@@ -38,13 +38,12 @@ write_stream._write = function (chunk, enc, next) {
     next();
   } else {
     var filename = output_dir + sha1(data.substring(0, tabIndex));
-    fs.writeFile(filename, data, {flag: 'w'}, function () {
-      if (idx % 10000 === 0) {
-        console.log('Processed ' + idx + ' terms with ' + errors + ' errors.');
-      }
-      idx++;
-      next();
-    });
+    fs.writeFileSync(filename, data, {flag: 'w'});
+    if (idx % 10000 === 0) {
+      console.log('Processed ' + idx + ' terms with ' + errors + ' errors.');
+    }
+    idx++;
+    next();
   }
 };
 
