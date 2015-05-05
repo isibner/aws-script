@@ -62,9 +62,11 @@ write_stream.on('error', function (e) {
 
 s3.listObjects(listObjectsParams, function (_err, s3objects) {
   console.log(s3objects.Contents);
-  hl(s3objects.Contents).map(function (datum) {
+  var streams = require('underscore').map(s3objects.Contents, function (datum) {
     var getObjectParams = {Bucket: 'cis555-bucket', Key: datum.Key};
     var strm = s3.getObject(getObjectParams).createReadStream();
     return strm;
-  }).series().split().pipe(write_stream);
+  });
+  var hlStreams = require('underscore').map(streams, hl);
+  hl(hlStreams).parallel(3).split().pipe(write_stream);
 });
