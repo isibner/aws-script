@@ -24,20 +24,22 @@ var idx = 0, errors = 0;
 var folder_name = 'inverted-index-merged';
 var listObjectsParams = {Bucket: 'cis555-bucket', Prefix: folder_name + '/part-r'};
 // WARNING: Change if you run this again!
-var output_dir = '/ec2-data/tfidfs_out_1/';
+var output_dir = 'ec2-data/tfidfs_out_1/';
 require('mkdirp').sync(output_dir);
 
 s3.listObjects(listObjectsParams, function (_err, s3objects) {
   console.log(s3objects.Contents);
-  var streams = s3objects.Contents.map(function (datum) {
-    var getObjectParams = {Bucket: 'cis555-bucket', Key: datum.Key};
-    return s3.getObject(getObjectParams).createReadStream();
-  });
-  async.parallel(streams.map(function (strm) {
+  async.series(s3objects.Contents.map(function (datum) {
     return function (callback) {
+      var getObjectParams = {Bucket: 'cis555-bucket', Key: datum.Key};
+      var strm = s3.getObject(getObjectParams).createReadStream();
       var Writable = require('stream').Writable;
       var write_stream = Writable();
       write_stream._write = function (chunk, enc, next) {
+        if (chunk.length > 10 * 1024 * 1024) {
+          console.log('chunk too large - had length ' + chunk.length);
+          next();
+        }
         var data = chunk.toString();
         var tabIndex = data.indexOf('\t');
         if (tabIndex === -1) {
@@ -54,8 +56,11 @@ s3.listObjects(listObjectsParams, function (_err, s3objects) {
           next();
         }
       };
-      strm.pipe(hl().split()).pipe(write_stream);
-      write_stream.on('finish', callback);
+      hl(strm).split().pipe(write_stream);
+      write_stream.on('finish', function (e, d) {
+        console.log('Finished a stream!');
+        callback(e, d);
+      });
     };
   }), function (e) {
     if (e) {
