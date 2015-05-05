@@ -55,7 +55,7 @@ s3.listObjects(listObjectsParams, function (_err, s3objects) {
         }
       };
       stream.pipe(write_stream);
-      write_stream.finish(callback);
+      write_stream.on('finish', callback);
     };
   }), function (e) {
     if (e) {
