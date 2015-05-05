@@ -27,18 +27,17 @@ var listObjectsParams = {Bucket: 'cis555-bucket', Prefix: folder_name + '/part-r
 var output_dir = 'ec2-data/tfidfs_out_2/';
 require('mkdirp').sync(output_dir);
 
-var stream = require('stream');
-var write_stream = new stream.Writable();
-write_stream._write = function (chunk, enc, next) {
-  var data = chunk.toString();
-  var tabIndex = data.indexOf('\t');
+
+
+var worker = function (line, next) {
+  var tabIndex = line.indexOf('\t');
   if (tabIndex === -1) {
-    console.log('No tab char for ' + data.substring(0, 50));
+    console.log('No tab char for ' + line.substring(0, 50));
     console.log('ignoring...');
     next();
   } else {
-    var filename = output_dir + sha1(data.substring(0, tabIndex));
-    fs.writeFileSync(filename, chunk, {flag: 'w'});
+    var filename = output_dir + sha1(line.substring(0, tabIndex));
+    fs.writeFileSync(filename, line, {flag: 'w'});
     if (idx % 10000 === 0) {
       console.log('Processed ' + idx + ' terms with ' + errors + ' errors.');
     }
@@ -47,32 +46,21 @@ write_stream._write = function (chunk, enc, next) {
   }
 };
 
-write_stream.on('finish', function () {
-  console.log('Finished processing ' + idx + ' terms with ' + errors + ' errors');
-});
-
-write_stream.on('end', function () {
-  console.log('ENDED processing ' + idx + ' terms with ' + errors + ' errors');
-});
-
-write_stream.on('error', function (e) {
-  errors++;
-  console.log('ERROR: ' + e.message);
-});
-
-var streamidx = 1;
-
 s3.listObjects(listObjectsParams, function (_err, s3objects) {
+  var contentIdx = -1;
   console.log(s3objects.Contents);
-  var streams = require('underscore').map(s3objects.Contents, function (datum) {
-    var getObjectParams = {Bucket: 'cis555-bucket', Key: datum.Key};
-    var strm = s3.getObject(getObjectParams).createReadStream();
-    strm.on('end', function () {
-      console.log('Finished reading stream ' + streamidx);
-      streamidx++;
-    });
-    return strm;
-  });
-  var hlStreams = require('underscore').map(streams, hl);
-  hl(hlStreams).parallel(1).split().pipe(write_stream);
+  var q = async.queue(worker, 100);
+  q.drain = function () {
+    if (contentIdx === s3objects.Contents.length) {
+      console.log(idx + ' items processed with ' + errors + ' errors');
+    } else {
+      contentIdx++;
+      console.log('Considering file ' + contentIdx);
+      var getObjectParams = {Bucket: 'cis555-bucket', Key: s3objects.Contents[contentIdx].Key};
+      hl(s3.getObject(getObjectParams).createReadStream()).split().toArray(function (array) {
+        q.push(array);
+      });
+    }
+  };
+  q.push([]);
 });
