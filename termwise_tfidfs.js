@@ -57,9 +57,13 @@ s3.listObjects(listObjectsParams, function (_err, s3objects) {
         }
       };
       hl(strm).split().pipe(write_stream);
-      write_stream.on('end', function (e, d) {
+      write_stream.on('end', function () {
         console.log('Finished a stream!');
-        callback(e, d);
+        callback();
+      });
+      write_stream.on('error', function (e) {
+        errors++;
+        console.log('ERROR: ' + e.message);
       });
     };
   }), function (e) {
