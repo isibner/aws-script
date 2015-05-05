@@ -2,12 +2,11 @@ var AWS = require('aws-sdk');
 var hl = require('highland');
 var crypto = require('crypto');
 var async = require('async');
+var fs = require('fs');
 
 var s3 = new AWS.S3();
-var folder_name = 'inverted-index-merged';
-var listObjectsParams = {Bucket: 'cis555-bucket', Prefix: folder_name + '/part-r'};
 
-var sha1 = function(input){
+var sha1 = function (input) {
     var str = crypto.createHash('sha1').update(input).digest('hex');
     while (str.charAt(0) === '0') {
       str = str.substring(1);
@@ -17,46 +16,52 @@ var sha1 = function(input){
 
 var idx = 0, errors = 0;
 
-var Writable = require('stream').Writable;
-var write_stream = Writable();
-var FOLDER_NAME = 'termwise_tfidfs_out/';
-write_stream._write = function (chunk, enc, next) {
-  var data = chunk.toString();
-  var tabIndex = data.indexOf('\t');
-  if (tabIndex === -1) {
-    console.log('No tab char for ' + data);
-    console.log('ignoring...');
-    next();
-  } else {
-    var filename = sha1(data.substring(0, tabIndex));
-    var putObjectParams = {Bucket: 'cis555-bucket', Key: FOLDER_NAME + filename, Body: data};
-    s3.putObject(putObjectParams, function (err, data) {
-      if (err) {
-        console.log(err.message);
-        errors++;
-      }
-      if (idx % 1000 === 0){
-        console.log('Processed ' + idx + ' terms with ' + errors + ' errors.');
-      }
-      idx++;
-      next();
-    })
-  }
-};
-
-
 // Each line in each file
 // Split by tab
 // First item is term; hash this and it becomes filename
 // Store the remainder as the contents of that file
-s3.listObjects(listObjectsParams, function (e, data) {
-  console.log(data.Contents);
-  hl(data.Contents)
-  .map(function (datum) {
+// write everything to /ec2_data
+var folder_name = 'inverted-index-merged';
+var listObjectsParams = {Bucket: 'cis555-bucket', Prefix: folder_name + '/part-r'};
+// WARNING: Change if you run this again!
+var output_dir = '/ec2-data/tfidfs_out_1/';
+require('mkdirp').sync(output_dir);
+
+s3.listObjects(listObjectsParams, function (_err, s3objects) {
+  console.log(s3objects.Contents);
+  var streams = s3objects.Contents.map(function (datum) {
     var getObjectParams = {Bucket: 'cis555-bucket', Key: datum.Key};
-    return hl(s3.getObject(getObjectParams).createReadStream());
-  })
-  .series()
-  .split()
-  .pipe(write_stream);
-})
+    return hl(s3.getObject(getObjectParams).createReadStream()).split();
+  });
+  async.parallel(streams.map(function (stream) {
+    return function (callback) {
+      var Writable = require('stream').Writable;
+      var write_stream = Writable();
+      write_stream.write = function (chunk, enc, next) {
+        var data = chunk.toString();
+        var tabIndex = data.indexOf('\t');
+        if (tabIndex === -1) {
+          console.log('No tab char for ' + data);
+          console.log('ignoring...');
+          next();
+        } else {
+          var filename = output_dir + sha1(data.substring(0, tabIndex));
+          fs.writeFileSync(filename, data, {flag: 'w+'});
+          if (idx % 1000 === 0) {
+            console.log('Processed ' + idx + ' terms with ' + errors + ' errors.');
+          }
+          idx++;
+          next();
+        }
+      };
+      stream.pipe(write_stream);
+      write_stream.finish(callback);
+    };
+  }), function (e) {
+    if (e) {
+      console.log('Finished but had error: ' + e.message);
+    } else {
+      console.log('Finished processing ' + idx + ' terms with no errors');
+    }
+  });
+});
