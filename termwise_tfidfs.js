@@ -58,6 +58,7 @@ s3.listObjects(listObjectsParams, function (_err, s3objects) {
       console.log('Considering file ' + contentIdx);
       var getObjectParams = {Bucket: 'cis555-bucket', Key: s3objects.Contents[contentIdx].Key};
       hl(s3.getObject(getObjectParams).createReadStream()).split().toArray(function (array) {
+        console.log('created an array of length ' + array.length);
         q.push(array);
       });
     }
