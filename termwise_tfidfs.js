@@ -31,9 +31,9 @@ s3.listObjects(listObjectsParams, function (_err, s3objects) {
   console.log(s3objects.Contents);
   var streams = s3objects.Contents.map(function (datum) {
     var getObjectParams = {Bucket: 'cis555-bucket', Key: datum.Key};
-    return hl(s3.getObject(getObjectParams).createReadStream()).split();
+    return hl(s3.getObject(getObjectParams).createReadStream());
   });
-  async.parallel(streams.map(function (stream) {
+  async.parallel(streams.map(function (hlStream) {
     return function (callback) {
       var Writable = require('stream').Writable;
       var write_stream = Writable();
@@ -54,7 +54,7 @@ s3.listObjects(listObjectsParams, function (_err, s3objects) {
           next();
         }
       };
-      stream.pipe(write_stream);
+      hlStream.split().pipe(write_stream);
       write_stream.on('finish', callback);
     };
   }), function (e) {
