@@ -28,24 +28,25 @@ var output_dir = 'ec2-data/tfidfs_out_2/';
 require('mkdirp').sync(output_dir);
 
 var Writable = require('stream').Writable;
-var write_stream = new Writable();
-write_stream.prototype._write = function (chunk, enc, next) {
-  var data = chunk.toString();
-  var tabIndex = data.indexOf('\t');
-  if (tabIndex === -1) {
-    console.log('No tab char for ' + data);
-    console.log('ignoring...');
-    next();
-  } else {
-    var filename = output_dir + sha1(data.substring(0, tabIndex));
-    fs.writeFileSync(filename, data, {flag: 'w+'});
-    if (idx % 10000 === 0) {
-      console.log('Processed ' + idx + ' terms with ' + errors + ' errors.');
+var write_stream = new Writable({
+  write: function (chunk, enc, next) {
+    var data = chunk.toString();
+    var tabIndex = data.indexOf('\t');
+    if (tabIndex === -1) {
+      console.log('No tab char for ' + data);
+      console.log('ignoring...');
+      next();
+    } else {
+      var filename = output_dir + sha1(data.substring(0, tabIndex));
+      fs.writeFileSync(filename, data, {flag: 'w+'});
+      if (idx % 10000 === 0) {
+        console.log('Processed ' + idx + ' terms with ' + errors + ' errors.');
+      }
+      idx++;
+      next();
     }
-    idx++;
-    next();
   }
-};
+});
 
 write_stream.on('finish', function () {
   console.log('Finished processing ' + idx + ' terms with ' + errors + ' errors');
