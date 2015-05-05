@@ -24,7 +24,7 @@ var idx = 0, errors = 0;
 var folder_name = 'inverted-index-merged';
 var listObjectsParams = {Bucket: 'cis555-bucket', Prefix: folder_name + '/part-r'};
 // WARNING: Change if you run this again!
-var output_dir = 'ec2-data/tfidfs_out_1/';
+var output_dir = 'ec2-data/tfidfs_out_2/';
 require('mkdirp').sync(output_dir);
 
 var Writable = require('stream').Writable;
