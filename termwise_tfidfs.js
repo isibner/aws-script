@@ -38,12 +38,13 @@ write_stream._write = function (chunk, enc, next) {
     next();
   } else {
     var filename = output_dir + sha1(data.substring(0, tabIndex));
-    fs.writeFileSync(filename, data, {flag: 'w+'});
-    if (idx % 10000 === 0) {
-      console.log('Processed ' + idx + ' terms with ' + errors + ' errors.');
-    }
-    idx++;
-    next();
+    fs.writeFile(filename, data, {flag: 'w'}, function () {
+      if (idx % 10000 === 0) {
+        console.log('Processed ' + idx + ' terms with ' + errors + ' errors.');
+      }
+      idx++;
+      next();
+    });
   }
 };
 
@@ -60,13 +61,19 @@ write_stream.on('error', function (e) {
   console.log('ERROR: ' + e.message);
 });
 
+var streamidx = 1;
+
 s3.listObjects(listObjectsParams, function (_err, s3objects) {
   console.log(s3objects.Contents);
   var streams = require('underscore').map(s3objects.Contents, function (datum) {
     var getObjectParams = {Bucket: 'cis555-bucket', Key: datum.Key};
     var strm = s3.getObject(getObjectParams).createReadStream();
+    strm.on('end', function () {
+      console.log('Finished reading stream ' + streamidx);
+      streamidx++;
+    });
     return strm;
   });
   var hlStreams = require('underscore').map(streams, hl);
-  hl(hlStreams).parallel(3).split().pipe(write_stream);
+  hl(hlStreams).parallel(1).split().pipe(write_stream);
 });
