@@ -27,41 +27,37 @@ var listObjectsParams = {Bucket: 'cis555-bucket', Prefix: folder_name + '/part-r
 var output_dir = 'ec2-data/tfidfs_out_2/';
 require('mkdirp').sync(output_dir);
 
-
-
-var worker = function (line, next) {
-  var tabIndex = line.indexOf('\t');
-  if (tabIndex === -1) {
-    console.log('No tab char for ' + line.substring(0, 50));
-    console.log('ignoring...');
-    next();
-  } else {
-    var filename = output_dir + sha1(line.substring(0, tabIndex));
-    fs.writeFileSync(filename, line, {flag: 'w'});
-    if (idx % 10000 === 0) {
-      console.log('Processed ' + idx + ' terms with ' + errors + ' errors.');
-    }
-    idx++;
-    next();
-  }
+var fileworker = function (Key, callback) {
+  var getObjectParams = {Bucket: 'cis555-bucket', Key: Key};
+  hl(s3.getObject(getObjectParams).createReadStream()).split().toArray(function (array) {
+    console.log('created an array of length ' + array.length);
+    async.parallelLimit(array.map(function (line) {
+      return function (next) {
+        var tabIndex = line.indexOf('\t');
+        if (tabIndex === -1) {
+          console.log('No tab char for ' + line.substring(0, 50));
+          console.log('ignoring...');
+          next();
+        } else {
+          var filename = output_dir + sha1(line.substring(0, tabIndex));
+          fs.writeFileSync(filename, line, {flag: 'w'});
+          if (idx % 10000 === 0) {
+            console.log('Processed ' + idx + ' terms with ' + errors + ' errors.');
+          }
+          idx++;
+          next();
+        }
+      };
+    }), 100, callback);
+  });
 };
 
 s3.listObjects(listObjectsParams, function (_err, s3objects) {
-  var contentIdx = -1;
-  console.log(s3objects.Contents);
-  var q = async.queue(worker, 100);
+  var q = async.queue(fileworker, 1);
   q.drain = function () {
-    if (contentIdx === s3objects.Contents.length) {
       console.log(idx + ' items processed with ' + errors + ' errors');
-    } else {
-      contentIdx++;
-      console.log('Considering file ' + contentIdx);
-      var getObjectParams = {Bucket: 'cis555-bucket', Key: s3objects.Contents[contentIdx].Key};
-      hl(s3.getObject(getObjectParams).createReadStream()).split().toArray(function (array) {
-        console.log('created an array of length ' + array.length);
-        q.push(array);
-      });
-    }
   };
-  q.push([]);
+  q.push(s3objects.Contents.map(function (obj) {
+    return obj.Key;
+  }));
 });
