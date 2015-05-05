@@ -27,29 +27,32 @@ var listObjectsParams = {Bucket: 'cis555-bucket', Prefix: folder_name + '/part-r
 var output_dir = 'ec2-data/tfidfs_out_2/';
 require('mkdirp').sync(output_dir);
 
-var Writable = require('stream').Writable;
-var write_stream = new Writable({
-  write: function (chunk, enc, next) {
-    var data = chunk.toString();
-    var tabIndex = data.indexOf('\t');
-    if (tabIndex === -1) {
-      console.log('No tab char for ' + data);
-      console.log('ignoring...');
-      next();
-    } else {
-      var filename = output_dir + sha1(data.substring(0, tabIndex));
-      fs.writeFileSync(filename, data, {flag: 'w+'});
-      if (idx % 10000 === 0) {
-        console.log('Processed ' + idx + ' terms with ' + errors + ' errors.');
-      }
-      idx++;
-      next();
+var stream = require('stream');
+var write_stream = new stream.Writable();
+write_stream._write = function (chunk, enc, next) {
+  var data = chunk.toString();
+  var tabIndex = data.indexOf('\t');
+  if (tabIndex === -1) {
+    console.log('No tab char for ' + data);
+    console.log('ignoring...');
+    next();
+  } else {
+    var filename = output_dir + sha1(data.substring(0, tabIndex));
+    fs.writeFileSync(filename, data, {flag: 'w+'});
+    if (idx % 10000 === 0) {
+      console.log('Processed ' + idx + ' terms with ' + errors + ' errors.');
     }
+    idx++;
+    next();
   }
-});
+};
 
 write_stream.on('finish', function () {
   console.log('Finished processing ' + idx + ' terms with ' + errors + ' errors');
+});
+
+write_stream.on('end', function () {
+  console.log('ENDED processing ' + idx + ' terms with ' + errors + ' errors');
 });
 
 write_stream.on('error', function (e) {
