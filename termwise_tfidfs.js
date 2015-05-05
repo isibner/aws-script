@@ -49,7 +49,7 @@ s3.listObjects(listObjectsParams, function (_err, s3objects) {
         } else {
           var filename = output_dir + sha1(data.substring(0, tabIndex));
           fs.writeFileSync(filename, data, {flag: 'w+'});
-          if (idx % 1000 === 0) {
+          if (idx % 10000 === 0) {
             console.log('Processed ' + idx + ' terms with ' + errors + ' errors.');
           }
           idx++;
@@ -57,7 +57,7 @@ s3.listObjects(listObjectsParams, function (_err, s3objects) {
         }
       };
       hl(strm).split().pipe(write_stream);
-      write_stream.on('finish', function (e, d) {
+      write_stream.on('end', function (e, d) {
         console.log('Finished a stream!');
         callback(e, d);
       });
