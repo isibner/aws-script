@@ -33,12 +33,12 @@ write_stream._write = function (chunk, enc, next) {
   var data = chunk.toString();
   var tabIndex = data.indexOf('\t');
   if (tabIndex === -1) {
-    console.log('No tab char for ' + data);
+    console.log('No tab char for ' + data.substring(0, 50));
     console.log('ignoring...');
     next();
   } else {
     var filename = output_dir + sha1(data.substring(0, tabIndex));
-    fs.writeFileSync(filename, data, {flag: 'w'});
+    fs.writeFileSync(filename, chunk, {flag: 'w'});
     if (idx % 10000 === 0) {
       console.log('Processed ' + idx + ' terms with ' + errors + ' errors.');
     }
