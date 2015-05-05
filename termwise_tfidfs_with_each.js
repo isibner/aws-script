@@ -34,6 +34,7 @@ s3.listObjects(listObjectsParams, function (_err, s3objects) {
     if (tabIndex === -1) {
       console.log('No tab char for ' + data.substring(0, 200) + '...');
       console.log('ignoring...');
+      errors++;
     } else {
       var filename = output_dir + sha1(data.substring(0, tabIndex));
       fs.writeFileSync(filename, data, {flag: 'w+'});
