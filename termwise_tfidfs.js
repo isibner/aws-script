@@ -38,6 +38,8 @@ s3.listObjects(listObjectsParams, function (_err, s3objects) {
       var Writable = require('stream').Writable;
       var write_stream = Writable();
       write_stream.write = function (chunk, enc, next) {
+        console.log(chunk);
+        console.log(enc);
         var data = chunk.toString();
         var tabIndex = data.indexOf('\t');
         if (tabIndex === -1) {
