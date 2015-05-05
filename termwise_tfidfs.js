@@ -28,12 +28,8 @@ var output_dir = 'ec2-data/tfidfs_out_2/';
 require('mkdirp').sync(output_dir);
 
 var Writable = require('stream').Writable;
-var write_stream = Writable();
-write_stream._write = function (chunk, enc, next) {
-  if (chunk.length > 10 * 1024 * 1024) {
-    console.log('chunk too large - had length ' + chunk.length);
-    next();
-  }
+var write_stream = new Writable();
+write_stream.prototype._write = function (chunk, enc, next) {
   var data = chunk.toString();
   var tabIndex = data.indexOf('\t');
   if (tabIndex === -1) {
