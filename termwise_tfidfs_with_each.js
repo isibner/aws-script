@@ -6,19 +6,39 @@ var fs = require('fs');
 
 var s3 = new AWS.S3();
 
-var sha1 = function (input) {
-    var str = crypto.createHash('sha1').update(input).digest('hex');
-    while (str.charAt(0) === '0') {
-      str = str.substring(1);
+/** Function count the occurrences of substring in a string;
+ * @param {String} string   Required. The string;
+ * @param {String} subString    Required. The string to search for;
+ * @param {Boolean} allowOverlapping    Optional. Default: false;
+ */
+function occurrences(string, subString, allowOverlapping) {
+
+    string += ''; subString += '';
+    if (subString.length <= 0) {
+      return string.length + 1;
     }
-    return str;
-};
+    var n = 0, pos = 0;
+    var step = (allowOverlapping) ? (1) : (subString.length);
+
+    while (true) {
+        pos = string.indexOf(subString, pos);
+        if (pos >= 0) {
+          n++;
+          pos += step;
+        } else {
+          break;
+        }
+    }
+    return (n);
+}
 
 var idx = 0, errors = 0;
-var folder_name = 'inverted-index-merged';
+var folder_name = 'inverted-index-final';
 var listObjectsParams = {Bucket: 'cis555-bucket', Prefix: folder_name + '/part-r'};
-var output_dir = 'ec2-data/tfidfs_out_2/';
+var output_dir = 'ec2-data/tfidfs_out_final/';
+var counts_dir = 'ec2-data/tfidfs_counts/';
 require('mkdirp').sync(output_dir);
+require('mkdirp').sync(counts_dir);
 
 s3.listObjects(listObjectsParams, function (_err, s3objects) {
   var streams = require('underscore').map(s3objects.Contents, function (datum) {
@@ -36,8 +56,10 @@ s3.listObjects(listObjectsParams, function (_err, s3objects) {
       console.log('ignoring...');
       errors++;
     } else {
-      var filename = output_dir + sha1(data.substring(0, tabIndex));
+      var filename = output_dir + data.substring(0, tabIndex);
       fs.writeFileSync(filename, data, {flag: 'w+'});
+      var countsFilename = counts_dir + data.substring(0, tabIndex);
+      fs.writeFileSync(countsFilename, '' + occurrences(data, 'snappy'), {flag: 'w+'});
       if (idx % 10000 === 0) {
         console.log('Processed ' + idx + ' terms with ' + errors + ' errors.');
       }
