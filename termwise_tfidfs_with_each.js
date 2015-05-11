@@ -35,8 +35,8 @@ function occurrences(string, subString, allowOverlapping) {
 var idx = 0, errors = 0;
 var folder_name = 'inverted-index-final';
 var listObjectsParams = {Bucket: 'cis555-bucket', Prefix: folder_name + '/part-r'};
-var output_dir = 'ec2-data/tfidfs_out_final/';
-var counts_dir = 'ec2-data/tfidfs_counts/';
+var output_dir = 'ec2-data/tfidfs_out_final_2/';
+var counts_dir = 'ec2-data/tfidfs_counts_2/';
 require('mkdirp').sync(output_dir);
 require('mkdirp').sync(counts_dir);
 
@@ -55,8 +55,13 @@ s3.listObjects(listObjectsParams, function (_err, s3objects) {
       console.log('No tab char for ' + data.substring(0, 200) + '...');
       console.log('ignoring...');
       errors++;
+    } else if ((output_dir + data.substring(0, tabIndex)).length > 200) {
+        console.log('File name is ' + (output_dir + data.substring(0, tabIndex)).length + ' chars, which is too long. First 200 chars -- ' + data.substring(0, 200) + '...');
+        console.log('ignoring...');
+        errors++;
     } else {
       var filename = output_dir + data.substring(0, tabIndex);
+
       fs.writeFileSync(filename, data, {flag: 'w+'});
       var countsFilename = counts_dir + data.substring(0, tabIndex);
       fs.writeFileSync(countsFilename, '' + occurrences(data, 'snappy'), {flag: 'w+'});
